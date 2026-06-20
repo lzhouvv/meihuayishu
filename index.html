@@ -29,7 +29,7 @@
     --radius-sm: 8px;
     --shadow: 0 8px 40px rgba(0,0,0,.55);
   }
-  html { scroll-behavior: smooth; font-size: 20px; }
+  html { scroll-behavior: smooth; font-size: 22px; }
   body {
     font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Serif SC', sans-serif;
     background: var(--bg-dark);
@@ -241,7 +241,7 @@
   .pagination .page-info { font-size: .72rem; color: var(--text-muted); }
 
   @media (max-width: 768px) {
-    html { font-size: 15px; }
+    html { font-size: 19px; }
     .container { padding: 0 8px; }
     .header { padding: 20px 12px 14px; }
     .header h1 { font-size: 1.1rem; letter-spacing: 2px; }
@@ -313,7 +313,7 @@
   }
 
   @media (max-width: 480px) {
-    html { font-size: 14px; }
+    html { font-size: 18px; }
     .match-body .mb-home .ti, .match-body .mb-away .ti { min-width: 40px; }
     .history-item .hi-home .ti, .history-item .hi-away .ti { min-width: 36px; }
     .top-bar .tb-item:last-child .btn { font-size: .7rem; padding: 5px 10px; }
@@ -333,8 +333,8 @@
   <div class="top-bar">
     <div class="tb-item"><span class="tb-icon">⏱</span> <span class="tb-val" id="current-time">--:--</span></div>
     <div class="tb-item" style="margin-left:auto;display:flex;gap:4px;align-items:center">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()" style="font-size:.65rem;padding:3px 8px">📥 导入</button>
-      <button class="btn btn-ghost btn-sm" onclick="exportHistory()" style="font-size:.65rem;padding:3px 8px">📤 导出</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportHistory()" style="font-size:.65rem;padding:3px 8px">↑ 导出</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()" style="font-size:.65rem;padding:3px 8px">↓ 导入</button>
       <button class="btn btn-ghost btn-sm" onclick="showScoreEditor()" style="font-size:.65rem;padding:3px 8px">✏️ 比分</button>
       <input type="file" id="import-file" accept=".csv,.xls,.xlsx" style="display:none" onchange="importHistory(event)">
       <button class="btn btn-sm btn-primary" onclick="refreshScores()" title="刷新最新比分" id="refresh-btn" style="padding:4px 12px;font-size:.75rem">🔄 刷新比分</button>
@@ -431,7 +431,14 @@
       </div>
 
       <div class="card" style="background:transparent;border:none;padding:0;margin:12px 0 0">
-        <div class="card-title"><span class="icon">📊</span> 比赛预测</div>
+        <div class="card-title"><span class="icon">📊</span> 比赛预测
+          <span style="flex:1"></span>
+          <span id="pred-view-btns" style="display:flex;gap:4px;font-size:.65rem">
+            <span class="history-btn" style="background:rgba(212,168,67,.15);color:var(--accent-light);border-color:var(--accent-dim)" onclick="setPredView('primary')" id="pv-primary">主预测</span>
+            <span class="history-btn" onclick="setPredView('alt')" id="pv-alt">备选</span>
+            <span class="history-btn" onclick="setPredView('all')" id="pv-all">全部</span>
+          </span>
+        </div>
         <div class="prediction-grid">
           <div class="pred-item"><div class="p-label">🏆 胜平负</div><div class="p-value" id="pred-wdl">─</div><div class="p-detail" id="pred-wdl-detail"></div><div id="pred-wdl-badge"></div></div>
           <div class="pred-item"><div class="p-label">🔄 半全场</div><div class="p-value" id="pred-htft">─</div><div class="p-detail" id="pred-htft-detail"></div></div>
@@ -466,6 +473,8 @@
       <div id="history-detail-body"></div>
     </div>
   </div>
+
+  <div id="toast" style="position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:.82rem;color:var(--text);z-index:300;display:none;box-shadow:0 8px 30px rgba(0,0,0,.5);white-space:nowrap"></div>
 
   <div class="footer">— 梅花易数 · 以易测球 ｜ 2026 FIFA World Cup —</div>
 </div>
@@ -577,8 +586,26 @@ function makePred(rel,body,use,mv,ph,ch){
   if(ps[0]===0 && ps[1]===0) pht=['平-平','全场互交白卷。'];
   var g=ps[0]+ps[1];
   var gs=g+'球'; var wh='预测总进球'+gs+'。';
+  // 概率计算
+  var probBase=50;
+  if(rel.type==='bodyKe'||rel.type==='useSheng') probBase+=15;
+  else if(rel.type==='useKe'||rel.type==='bodySheng') probBase+=5;
+  else if(rel.type==='harmony') probBase+=10;
+  else probBase+=5;
+  if(mv<=3) probBase+=5;
+  else probBase+=3;
+  // 确保在40-85之间
+  probBase=Math.min(85,Math.max(40,probBase));
+  var prob2=Math.min(probBase-15,60);
+  var probStr=probBase+'%';
+  var prob2Str=Math.max(prob2,15)+'%';
+  // 第二选项
+  var si2=(si+1)%arr.length, ps2=arr[si2], sc2=ps2[0]+':'+ps2[1];
+  var g2=ps2[0]+ps2[1];
+  var hi2=(hi+1)%opts.length, pht2=opts[hi2%opts.length];
+  if(ps2[0]===0 && ps2[1]===0) pht2=['平-平','全场互交白卷。'];
   var dt='【本卦】'+ph.n+'：'+ph.d+'\n【变卦】'+ch.n+'：'+ch.d+'\n【动爻】第'+mv+'爻变动。\n【体用】体卦'+body.symbol+body.name+'代表主队，用卦'+use.symbol+use.name+'代表客队。\n【生克】'+rel.desc+'。\n【总论】卦象呈'+ph.n+'化'+ch.n+'之势，此战'+wdl+'之象。';
-  return{wdl:wdl,wd:wd,wdlBadge:badge,htft:pht[0],htftDetail:'',score:sc,scoreDetail:'体卦'+body.symbol+body.name+'（'+body.wuxing+'）与用卦'+use.symbol+use.name+'（'+use.wuxing+'）'+rel.desc+'，动爻第'+mv+'爻变动。体用'+({'bodyKe':'相克主队占优','useSheng':'受生主队得利','useKe':'被克客队占优','bodySheng':'生泄主队不利','harmony':'比和势均力敌','neutral':'相安'}[rel.type]||'无特殊')+'，推演比分为'+sc+'。',goals:gs,goalsDetail:wh+'，预测总进球'+gs+'。',detailText:dt};
+  return{wdl:wdl,wd:wd,wdlBadge:badge,htft:pht[0],htftDetail:'',score:sc,scoreDetail:'体卦'+body.symbol+body.name+'（'+body.wuxing+'）与用卦'+use.symbol+use.name+'（'+use.wuxing+'）'+rel.desc+'，动爻第'+mv+'爻变动。体用'+({'bodyKe':'相克主队占优','useSheng':'受生主队得利','useKe':'被克客队占优','bodySheng':'生泄主队不利','harmony':'比和势均力敌','neutral':'相安'}[rel.type]||'无特殊')+'，推演比分为'+sc+'。',prob:probStr,goals:gs,goalsDetail:wh+'，预测总进球'+gs+'。',detailText:dt, wdl2:((wdl==='胜'?'负':wdl==='负'?'平局':'胜')), htft2:pht2[0], score2:sc2, goals2:g2+'球', prob2:prob2Str};
 }
 
 function divinate(ts,loc,m){
@@ -617,20 +644,54 @@ function renderResult(result){
   document.getElementById('ti-relation-symbol').textContent=t.symbol;
   document.getElementById('ti-relation-text').textContent=t.desc;
   document.getElementById('ti-summary').innerHTML='体卦 <strong>'+t.body.symbol+' '+t.body.name+'（'+t.body.wuxing+'）</strong> vs 用卦 <strong>'+t.use.symbol+' '+t.use.name+'（'+t.use.wuxing+'）</strong> —— '+t.desc;
-  document.getElementById('pred-wdl').textContent=p.wdl;
+  document.getElementById('pred-wdl').innerHTML=p.wdl+' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+p.prob+')</span>';
   document.getElementById('pred-wdl-detail').textContent=p.wd||'';
-  document.getElementById('pred-wdl-badge').innerHTML='<span class="p-badge '+p.wdlBadge+'">'+p.wdl+'</span>';
-  document.getElementById('pred-htft').textContent=p.htft;
+  document.getElementById('pred-wdl-badge').innerHTML='<span class="p-badge '+p.wdlBadge+'">'+p.wdl+' <span style="font-weight:400;font-size:.65rem">'+p.prob+'</span></span>';
+  document.getElementById('pred-htft').innerHTML=p.htft+' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+p.prob+')</span>';
   document.getElementById('pred-htft-detail').textContent=p.htftDetail||'';
-  document.getElementById('pred-score').textContent=p.score;
+  document.getElementById('pred-score').innerHTML=p.score+' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+p.prob+')</span>';
   document.getElementById('pred-score-detail').textContent=p.scoreDetail||'';
-  document.getElementById('pred-goals').textContent=p.goals;
+  document.getElementById('pred-goals').innerHTML=p.goals+' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+p.prob+')</span>';
   document.getElementById('pred-goals-detail').textContent=p.goalsDetail||'';
   document.getElementById('detail-content').innerHTML=p.detailText.replace(/\n/g,'<br>');
+  // 保存预测数据供切换视图使用
+  window._lastPred = p;
   document.getElementById('result-area').classList.add('open');
+  setPredView(window._predView||'primary');
 }
 function closeResult(){ document.getElementById('result-area').classList.remove('open'); }
 document.getElementById('result-area').onclick=function(e){ if(e.target===this) closeResult(); };
+var _predView='primary';
+function setPredView(mode){
+  _predView=mode; window._predView=mode;
+  var p=window._lastPred;
+  if(!p) return;
+  // 更新按钮高亮
+  ['primary','alt','all'].forEach(function(m){
+    var el=document.getElementById('pv-'+m);
+    if(!el) return;
+    if(m===mode){ el.style.background='rgba(212,168,67,.15)'; el.style.color='var(--accent-light)'; el.style.borderColor='var(--accent-dim)'; }
+    else{ el.style.background=''; el.style.color=''; el.style.borderColor=''; }
+  });
+  var showPrimary=(mode==='primary'||mode==='all');
+  var showAlt=(mode==='alt'||mode==='all');
+  if(showPrimary && showAlt){
+    document.getElementById('pred-wdl').innerHTML=p.wdl+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span> <span style="font-size:.65rem;color:var(--text-dim)">| '+p.wdl2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span></span>';
+    document.getElementById('pred-htft').innerHTML=p.htft+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span> <span style="font-size:.65rem;color:var(--text-dim)">| '+p.htft2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span></span>';
+    document.getElementById('pred-score').innerHTML=p.score+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span> <span style="font-size:.65rem;color:var(--text-dim)">| '+p.score2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span></span>';
+    document.getElementById('pred-goals').innerHTML=p.goals+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span> <span style="font-size:.65rem;color:var(--text-dim)">| '+p.goals2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span></span>';
+  } else if(showAlt){
+    document.getElementById('pred-wdl').innerHTML=p.wdl2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span>';
+    document.getElementById('pred-htft').innerHTML=p.htft2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span>';
+    document.getElementById('pred-score').innerHTML=p.score2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span>';
+    document.getElementById('pred-goals').innerHTML=p.goals2+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob2+')</span>';
+  } else {
+    document.getElementById('pred-wdl').innerHTML=p.wdl+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>';
+    document.getElementById('pred-htft').innerHTML=p.htft+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>';
+    document.getElementById('pred-score').innerHTML=p.score+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>';
+    document.getElementById('pred-goals').innerHTML=p.goals+' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>';
+  }
+}
 
 // ==================== 赛程 ====================
 var selectedMatch=null;
@@ -747,8 +808,20 @@ function renderHistory(){
   for(var i=start;i<end;i++){ var r=list[i];
     var fh=(TEAMS[r.home]&&TEAMS[r.home].flag)||''; var fa=(TEAMS[r.away]&&TEAMS[r.away].flag)||'';
     var isFinished=false; var saved=getSavedScores(); var key=r.home+'|'+r.away;
-    if(saved[key]||saved[r.away+'|'+r.home]) isFinished=true;
-    h+='<div class="history-item'+(isFinished?' finished':'')+'"><span class="hi-time">'+r.time+'</span><span class="hi-home" onclick="showHistoryDetail('+i+')"><span class="ti"><span class="hi-flag">'+fh+'</span><span class="hi-name">'+r.home+'</span></span></span><span class="hi-vs">vs</span><span class="hi-away" onclick="showHistoryDetail('+i+')"><span class="ti"><span class="hi-flag">'+fa+'</span><span class="hi-name">'+r.away+'</span></span></span><span class="hi-result '+r.wdlBadge+'">'+fmtWdl(r.wdl)+'</span><span class="hi-del" onclick="deleteHistory('+i+')" title="删除此记录">✕</span></div>';
+    var sc=saved[key]||saved[r.away+'|'+r.home]; if(sc) isFinished=true;
+    var isHit=false;
+    if(sc){
+      var rw=sc.h>sc.a?'胜':(sc.h<sc.a?'负':'平局');
+      isHit=(fmtWdl(r.wdl)===rw);
+    }
+    var hitCls=r.wdlBadge;
+    if(isFinished) hitCls='';
+    var viewMode=localStorage.getItem('mhys_history_view')||'all';
+    var altWdl=r.wdl2||(r.wdl==='胜'?'负':r.wdl==='负'?'平局':'胜');
+    var wdlDisplay=fmtWdl(r.wdl);
+    if(viewMode==='all') wdlDisplay=fmtWdl(r.wdl)+' | '+altWdl;
+    else if(viewMode==='alt') wdlDisplay=altWdl;
+    h+='<div class="history-item'+(isFinished?' finished':'')+'" onclick="showHistoryDetail('+i+')"><span class="hi-time">'+(r.time.slice(5)||r.time)+'</span><span class="hi-home"><span class="ti"><span class="hi-flag">'+fh+'</span><span class="hi-name">'+r.home+'</span></span></span><span class="hi-vs">vs</span><span class="hi-away"><span class="ti"><span class="hi-flag">'+fa+'</span><span class="hi-name">'+r.away+'</span></span></span><span class="hi-result '+hitCls+'">'+wdlDisplay+'</span><span class="hi-hit" style="display:inline-block;min-width:16px;text-align:center;font-size:.7rem;font-weight:700;color:var(--text);opacity:.6;margin-right:32px">'+(isHit?'✓':'')+'</span><span class="hi-del" onclick="event.stopPropagation();deleteHistory('+i+')" title="删除此记录">✕</span></div>';
   }
   // 翻页
   if(totalPages>1){
@@ -813,34 +886,46 @@ function showHistoryDetail(idx){
   var realTotal = hasReal ? (realScore.h + realScore.a) : null;
   var realHtft = ''; // 半全场暂无数据
   
-  var html='<div style="margin-bottom:10px"><div style="font-size:.72rem;color:var(--text-dim);margin-bottom:4px">'+rec.time+'</div>'
+  var html='<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--text-dim);margin-bottom:4px">'+(rec.time.slice(5)||rec.time)+'</div>'
     +'<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-dark)">'
     +'<span style="font-size:1.1rem">'+fh+'</span><span style="font-weight:700;font-size:.9rem">'+rec.home+'</span>'
     +'<span style="font-size:.72rem;color:var(--text-muted);margin:0 2px">vs</span>'
     +'<span style="font-size:1.1rem">'+fa+'</span><span style="font-weight:700;font-size:.9rem">'+rec.away+'</span>'
+    +'</div>'
+    // 视图切换按钮
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">'
+    +'<span style="display:flex;gap:4px;font-size:.65rem" id="hist-view-btns">'
+    +'<span class="history-btn" onclick="setHistView(\'primary\')" id="hv-primary" style="padding:2px 8px;font-size:.62rem">主预测</span>'
+    +'<span class="history-btn" onclick="setHistView(\'alt\')" id="hv-alt" style="padding:2px 8px;font-size:.62rem">备选</span>'
+    +'<span class="history-btn" onclick="setHistView(\'all\')" id="hv-all" style="padding:2px 8px;font-size:.62rem">全部</span>'
+    +'</span>'
+    +'<span class="btn btn-sm btn-primary" onclick="saveHistView()" style="padding:2px 12px;font-size:.62rem">保存</span>'
     +'</div></div>'
     +'<div class="prediction-grid" style="margin-bottom:10px">'
-    // 胜平负：预测 vs 实际
+    // 胜平负
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">🏆 胜平负</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
-    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+fmtWdl(r.predictions.wdl)+'</span>'
+    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem" id="hd-wdl">'+fmtWdl(r.predictions.wdl)+(r.predictions.prob?' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+r.predictions.prob+')</span>':'')+'</span>'
     +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitWdlStyle+'">'+realWdl+'</span>'+hitBadge:'')
     +'</div></div>'
     // 半全场
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">🔄 半全场</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
-    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+r.predictions.htft+'</span>'
+    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem" id="hd-htft">'+r.predictions.htft+(r.predictions.prob?' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+r.predictions.prob+')</span>':'')+'</span>'
+    +(hasReal && realScore.hh!==undefined && realScore.ha!==undefined?
+      (function(){ var htR=realScore.hh>realScore.ha?'胜':(realScore.hh<realScore.ha?'负':'平'); var actualHtft=htR+'-'+realWdl; var htHit=r.predictions.htft===actualHtft; var htStyle=htHit?'color:var(--success);font-weight:700':'opacity:.4;'; return '<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+htStyle+'">'+actualHtft+'</span>'; })()
+      :'')
     +'</div></div>'
-    // 比分：预测 vs 实际
+    // 比分
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">🥅 比分</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
-    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+r.predictions.score+'</span>'
+    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem" id="hd-score">'+r.predictions.score+(r.predictions.prob?' <span style="font-size:.6rem;color:var(--text-dim);font-weight:400">('+r.predictions.prob+')</span>':'')+'</span>'
     +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitScoreStyle+'">'+realScore.h+':'+realScore.a+'</span>':'')
     +'</div></div>'
-    // 总进球：预测 vs 实际
+    // 总进球
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">⚽ 总进球</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
-    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+r.predictions.goals+'</span>'
+    +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem" id="hd-goals">'+r.predictions.goals+'</span>'
     +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitGoalsStyle+'">'+realTotal+'球</span>':'')
     +'</div></div>'
     +'</div>'
@@ -854,6 +939,80 @@ function showHistoryDetail(idx){
     +'</div></div>';
   body.innerHTML=html;
   document.getElementById('history-detail-modal').classList.add('open');
+  // 应用已保存的视图
+  var savedView=localStorage.getItem('mhys_history_view')||'all';
+  window._histRecIdx=idx;
+  window._histRec=rec;
+  window._histViewMode=savedView;
+  window._histRealWdl=realWdl;
+  window._histRealScore=realScore||null;
+  window._histRealTotal=realTotal;
+  window._histHasReal=hasReal;
+  applyHistView(savedView);
+}
+function applyHistView(mode){
+  var rec=window._histRec; if(!rec) return;
+  var r=rec.resultData||{};
+  var p=r.predictions||{};
+  // 备选值（旧记录可能没有，动态生成）
+  var altWdl=rec.wdl2||(rec.wdl==='胜'?'负':rec.wdl==='负'?'平局':'胜');
+  var altHtft=rec.htft2||(p.htft==='平-平'?'胜-胜':'平-平');
+  var altScore=rec.score2||(rec.score==='2:1'?'1:0':'2:1');
+  var altGoals=rec.goals2||(rec.score2?parseInt(rec.score2.split(':')[0])+parseInt(rec.score2.split(':')[1])+'球':'2球');
+  // 如果记录本身存了完整的备选数据则用
+  if(r.predictions && r.predictions.wdl2) altWdl=r.predictions.wdl2;
+  if(r.predictions && r.predictions.htft2) altHtft=r.predictions.htft2;
+  if(r.predictions && r.predictions.score2) altScore=r.predictions.score2;
+  if(r.predictions && r.predictions.goals2) altGoals=r.predictions.goals2;
+
+  var showPrimary=(mode==='primary'||mode==='all');
+  var showAlt=(mode==='alt'||mode==='all');
+
+  var wdlEl=document.getElementById('hd-wdl');
+  var htftEl=document.getElementById('hd-htft');
+  var scoreEl=document.getElementById('hd-score');
+  var goalsEl=document.getElementById('hd-goals');
+
+  if(!wdlEl) return;
+  // 获取实际比分用于命中判断
+  var realWdlA=window._histRealWdl||'';
+  var realScoreA=window._histRealScore||null;
+  var realTotalA=window._histRealTotal||null;
+  var hasRealA=window._histHasReal||false;
+  var altHitWdl=hasRealA && (altWdl===realWdlA);
+  var altHitScore=hasRealA && realScoreA && (altScore===(realScoreA.h+':'+realScoreA.a));
+  var altHitGoals=hasRealA && realTotalA!==null && altGoals===(realTotalA+'球');
+  var aStyle=function(h){ return h?'color:var(--success);font-weight:700':'opacity:.4;'; };
+  if(showPrimary && showAlt){
+    wdlEl.innerHTML=fmtWdl(rec.wdl)+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'')+' <span style="font-size:.65rem;color:var(--text-dim)">| </span><span style="'+aStyle(altHitWdl)+'">'+altWdl+'</span>';
+    htftEl.innerHTML=p.htft+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'')+' <span style="font-size:.65rem;color:var(--text-dim)">| </span><span style="'+aStyle(false)+'">'+altHtft+'</span>';
+    scoreEl.innerHTML=rec.score+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'')+' <span style="font-size:.65rem;color:var(--text-dim)">| </span><span style="'+aStyle(altHitScore)+'">'+altScore+'</span>';
+    goalsEl.innerHTML=p.goals+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'')+' <span style="font-size:.65rem;color:var(--text-dim)">| </span><span style="'+aStyle(altHitGoals)+'">'+altGoals+'</span>';
+  } else if(showAlt){
+    wdlEl.innerHTML='<span style="'+aStyle(altHitWdl)+'">'+altWdl+'</span>';
+    htftEl.innerHTML='<span style="'+aStyle(false)+'">'+altHtft+'</span>';
+    scoreEl.innerHTML='<span style="'+aStyle(altHitScore)+'">'+altScore+'</span>';
+    goalsEl.innerHTML='<span style="'+aStyle(altHitGoals)+'">'+altGoals+'</span>';
+  } else {
+    wdlEl.innerHTML=fmtWdl(rec.wdl)+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'');
+    htftEl.innerHTML=p.htft+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'');
+    scoreEl.innerHTML=rec.score+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'');
+    goalsEl.innerHTML=p.goals+(p.prob?' <span style="font-size:.6rem;color:var(--text-dim)">('+p.prob+')</span>':'');
+  }
+  // 更新按钮高亮
+  ['primary','alt','all'].forEach(function(m){
+    var el=document.getElementById('hv-'+m);
+    if(!el) return;
+    if(m===mode){ el.style.background='rgba(212,168,67,.15)'; el.style.color='var(--accent-light)'; el.style.borderColor='var(--accent-dim)'; }
+    else{ el.style.background=''; el.style.color=''; el.style.borderColor=''; }
+  });
+}
+function setHistView(mode){ window._histViewMode=mode; applyHistView(mode); }
+function saveHistView(){
+  var mode=window._histViewMode||'all';
+  localStorage.setItem('mhys_history_view',mode);
+  showToast('视图已保存');
+  renderHistory();
 }
 function closeHistoryDetail(){ document.getElementById('history-detail-modal').classList.remove('open'); }
 function clearHistory(){
@@ -890,14 +1049,17 @@ function showTrash(){
   var trash=JSON.parse(localStorage.getItem('mhys_trash')||'[]');
   var body=document.getElementById('history-detail-body');
   if(trash.length===0){ body.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim)">回收站为空</div>'; document.getElementById('history-detail-modal').classList.add('open'); return; }
-  var h='';
+  var saved=getSavedScores();
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:.82rem;color:var(--text-dim)"><span>回收站（'+trash.length+' 条）</span><span style="display:flex;gap:6px"><span style="cursor:pointer;color:var(--danger);font-size:.7rem" onclick="if(confirm(\'确定清空回收站？\')){localStorage.removeItem(\'mhys_trash\');showTrash();}">清空</span></span></div>';
   for(var i=0;i<trash.length;i++){ var r=trash[i]; var fh=(TEAMS[r.home]&&TEAMS[r.home].flag)||'', fa=(TEAMS[r.away]&&TEAMS[r.away].flag)||'';
-    h+='<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.82rem">'
+    var isFinished=!!(saved[r.home+'|'+r.away]||saved[r.away+'|'+r.home]);
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.82rem'+(isFinished?';opacity:.4':'')+'">'
     +'<span style="flex:1">'+fh+' '+r.home+' vs '+fa+' '+r.away+'</span>'
     +'<span style="font-size:.68rem;color:var(--text-dim);margin-right:8px">'+r.time.slice(5,11)+'</span>'
-    +'<span style="cursor:pointer;color:var(--accent-light);font-size:.72rem" onclick="restoreTrash('+i+')">还原</span></div>';
+    +'<span style="cursor:pointer;color:var(--accent-light);font-size:.7rem" onclick="restoreTrash('+i+')">还原</span>'
+    +'<span style="cursor:pointer;color:var(--danger);font-size:.65rem;margin-left:4px" onclick="deleteTrash('+i+')">删除</span></div>';
   }
-  body.innerHTML='<div style="margin-bottom:10px;font-size:.82rem;color:var(--text-dim)">回收站（'+trash.length+' 条）</div>'+h;
+  body.innerHTML=h;
   document.getElementById('history-detail-modal').classList.add('open');
 }
 function restoreTrash(idx){
@@ -911,50 +1073,83 @@ function restoreTrash(idx){
   renderHistory();
   showTrash();
 }
+function deleteTrash(idx){
+  var trash=JSON.parse(localStorage.getItem('mhys_trash')||'[]');
+  trash.splice(idx,1);
+  localStorage.setItem('mhys_trash',JSON.stringify(trash));
+  showTrash();
+}
 document.getElementById('history-detail-modal').onclick=function(e){ if(e.target===this) closeHistoryDetail(); };
 
 // ==================== 手动修改比分 ====================
+var scoreEditorDate = '';
+
 function showScoreEditor(){
   var saved=getSavedScores();
-  var allDates=SORTED_DATES;
-  var body=document.getElementById('history-detail-body');
-  var h='<div style="margin-bottom:10px;font-size:.85rem;color:var(--text-dim)">手动修改已结束比赛的比分（输入后自动保存）</div>';
-  for(var di=0;di<allDates.length;di++){
-    var ds=allDates[di];
-    var ms=SCHEDULE[ds];
-    if(!ms) continue;
-    var dateLabel=ds.slice(5);
-    h+='<div style="font-size:.72rem;color:var(--accent-light);margin:8px 0 4px;font-weight:600">'+dateLabel+'</div>';
-    for(var mi=0;mi<ms.length;mi++){
-      var m=ms[mi];
-      var fh=(TEAMS[m.h]&&TEAMS[m.h].flag)||'', fa=(TEAMS[m.a]&&TEAMS[m.a].flag)||'';
-      var key=m.h+'|'+m.a;
-      var sc=saved[key];
-      if(!sc){ var rk=m.a+'|'+m.h; sc=saved[rk]; if(sc) sc={h:sc.a,a:sc.h}; }
-      var sh=sc?sc.h:'', sa=sc?sc.a:'';
-      h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">'
-        +'<span style="min-width:50px;font-size:.75rem">'+fh+' '+m.h+'</span>'
-        +'<input type="number" min="0" max="20" value="'+sh+'" style="width:36px;padding:2px 4px;background:var(--bg-dark);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.72rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'h\',this.value)">'
-        +'<span style="font-size:.7rem;color:var(--text-muted)">:</span>'
-        +'<input type="number" min="0" max="20" value="'+sa+'" style="width:36px;padding:2px 4px;background:var(--bg-dark);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.72rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'a\',this.value)">'
-        +'<span style="min-width:50px;font-size:.75rem">'+m.a+' '+fa+'</span>'
-        +'</div>';
-    }
-  }
-  body.innerHTML=h;
+  if(!scoreEditorDate) scoreEditorDate=document.getElementById('datePicker').value||SORTED_DATES[0]||'';
+  renderScoreEditor();
   document.getElementById('history-detail-modal').classList.add('open');
 }
-
+function renderScoreEditor(){
+  var saved=getSavedScores();
+  var body=document.getElementById('history-detail-body');
+  var ds=scoreEditorDate;
+  var ms=SCHEDULE[ds];
+  var dateIdx=SORTED_DATES.indexOf(ds);
+  var h='<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px">'
+    +'<span style="cursor:pointer;color:var(--accent-light);font-size:.8rem" onclick="shiftScoreDate(-1)">◀</span>'
+    +'<span style="font-size:.85rem;color:var(--text);font-weight:600">'+ds+'</span>'
+    +'<span style="cursor:pointer;color:var(--accent-light);font-size:.8rem" onclick="shiftScoreDate(1)">▶</span>'
+    +'</div>'
+    +'<div style="margin-bottom:8px;font-size:.72rem;color:var(--text-dim);text-align:center">全场：终场比分&nbsp;&nbsp;半场：半场比分（用于半全场判定）</div>';
+  if(!ms||ms.length===0){
+    h+='<div style="text-align:center;padding:20px;color:var(--text-dim)">该日期暂无比赛</div>';
+    body.innerHTML=h; return;
+  }
+  for(var mi=0;mi<ms.length;mi++){
+    var m=ms[mi];
+    var fh=(TEAMS[m.h]&&TEAMS[m.h].flag)||'', fa=(TEAMS[m.a]&&TEAMS[m.a].flag)||'';
+    var key=m.h+'|'+m.a;
+    var sc=saved[key];
+    if(!sc){ var rk=m.a+'|'+m.h; sc=saved[rk]; if(sc) sc={h:sc.a,a:sc.h,hh:sc.ha,ha:sc.hh}; }
+    var sh=sc?sc.h:'', sa=sc?sc.a:'', shh=sc?sc.hh:'', sha=sc?sc.ha:'';
+    h+='<div style="border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:6px;text-align:center">'
+      +'<div style="display:flex;align-items:center;justify-content:center;gap:4px;font-size:.82rem;font-weight:600;margin-bottom:6px">'+fh+' '+m.h+' vs '+m.a+' '+fa+'</div>'
+      +'<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:.75rem">'
+      +'<span style="color:var(--text-dim)">全场</span>'
+      +'<div style="display:flex;align-items:center;gap:4px">'
+      +'<input type="number" min="0" max="20" value="'+sh+'" style="width:96px;padding:6px 8px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'h\',this.value)">'
+      +'<span style="font-size:.8rem;color:var(--text-muted);font-weight:700">:</span>'
+      +'<input type="number" min="0" max="20" value="'+sa+'" style="width:96px;padding:6px 8px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'a\',this.value)">'
+      +'</div>'
+      +'<span style="color:var(--text-dim);margin-left:4px">半场</span>'
+      +'<div style="display:flex;align-items:center;gap:4px">'
+      +'<input type="number" min="0" max="20" value="'+shh+'" style="width:96px;padding:6px 8px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'hh\',this.value)">'
+      +'<span style="font-size:.8rem;color:var(--text-muted);font-weight:700">:</span>'
+      +'<input type="number" min="0" max="20" value="'+sha+'" style="width:96px;padding:6px 8px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'ha\',this.value)">'
+      +'</div>'
+      +'</div></div>';
+  }
+  h+='<div style="text-align:center;margin-top:12px"><button class="btn btn-primary" onclick="closeHistoryDetail()" style="padding:6px 28px">保存</button></div>';
+  body.innerHTML=h;
+}
+function shiftScoreDate(dir){
+  var idx=SORTED_DATES.indexOf(scoreEditorDate);
+  if(idx===-1) idx=0;
+  idx+=dir;
+  if(idx<0) idx=0;
+  if(idx>=SORTED_DATES.length) idx=SORTED_DATES.length-1;
+  scoreEditorDate=SORTED_DATES[idx];
+  renderScoreEditor();
+}
 function saveManualScore(key,side,val){
   var saved=getSavedScores();
-  var parts=key.split('|');
-  if(!saved[key]) saved[key]={h:'',a:''};
+  if(!saved[key]) saved[key]={};
   saved[key][side]=parseInt(val)||0;
   saveScores(saved);
   renderMatchList(document.getElementById('datePicker').value);
 }
 function exportHistory(){
-  // 导出起卦记录 + 比分数据
   var list=getHistory();
   var scores=getSavedScores();
   var csv='时间,主队,客队,预测结果,预测比分,本卦,变卦,实际主队得分,实际客队得分\n';
@@ -969,10 +1164,36 @@ function exportHistory(){
     csv+=t+','+h+','+a+','+w+','+s+','+pn+','+cn+','+sh+','+sa+'\n';
   }
   var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var fileName='起卦记录_'+new Date().toISOString().slice(0,10)+'.csv';
+  var suggestedPath='/Users/zhoudazhong/Library/Mobile Documents/com~apple~CloudDocs/AI网页同步数据/'+fileName;
+  // 尝试使用 File System Access API (Chrome/Edge)
+  if(window.showSaveFilePicker){
+    try {
+      var opts={ suggestedName:fileName, startIn:'desktop', types:[{description:'CSV文件',accept:{'text/csv':['.csv']}}] };
+      window.showSaveFilePicker(opts).then(function(fileHandle){
+        fileHandle.createWritable().then(function(writable){
+          writable.write(blob).then(function(){ writable.close(); });
+        });
+      }).catch(function(err){
+        if(err.name==='AbortError') return;
+        fallbackDownload(blob,fileName);
+      });
+      return;
+    } catch(e){ fallbackDownload(blob,fileName); }
+  } else { fallbackDownload(blob,fileName); }
+}
+function fallbackDownload(blob,fileName){
   var url=URL.createObjectURL(blob);
-  var a=document.createElement('a'); a.href=url; a.download='起卦记录_'+new Date().toISOString().slice(0,10)+'.csv';
+  var a=document.createElement('a'); a.href=url; a.download=fileName;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function showToast(msg,duration){
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(el._timer);
+  el._timer=setTimeout(function(){ el.style.display='none'; }, duration||2500);
 }
 
 function importHistory(event){
@@ -983,12 +1204,19 @@ function importHistory(event){
     try{
       var text=e.target.result;
       var lines=text.split('\n').filter(function(l){ return l.trim().length>0; });
-      if(lines.length<2){ alert('文件格式无效'); return; }
+      if(lines.length<2){ showToast('非目标数据'); return; }
+      var header=parseCSVLine(lines[0]);
+      var expectedHeader='时间,主队,客队,预测结果,预测比分,本卦,变卦';
+      if(header.length<7 || header[0]!=='时间'||header[1]!=='主队'||header[2]!=='客队'||header[3]!=='预测结果'){
+        showToast('非目标数据'); return;
+      }
       var imported=[];
       for(var i=1;i<lines.length;i++){
         // 按逗号分割，处理引号转义
         var parts=parseCSVLine(lines[i]);
         if(parts.length<7) continue;
+        var wdlVal=parts[3].trim();
+        if(['胜','负','平局','主不败'].indexOf(wdlVal)===-1) continue;
         var record={
           id: Date.now()+i,
           time: parts[0],
@@ -997,13 +1225,34 @@ function importHistory(event){
           wdl: parts[3],
           wdlBadge: parts[3]==='胜'?'win':parts[3]==='负'?'lose':parts[3]==='平局'?'draw':'win',
           score: parts[4],
-          hexagramName: parts[5],
-          changedName: parts[6],
-          resultData: null
+          hexagramName: parts[5]||'未知卦',
+          changedName: parts[6]||'未知卦',
+          resultData: {
+            predictions: {
+              wdl: parts[3],
+              wdlDetail: '',
+              htft: '--',
+              score: parts[4]||'--',
+              goals: (function(s){ if(!s)return '--球'; var p=s.split(':'); return (parseInt(p[0])+parseInt(p[1])||'--')+'球'; })(parts[4]),
+              goalsDetail: '',
+              detailText: '【本卦】'+(parts[5]||'未知')+'→【变卦】'+(parts[6]||'未知')
+            },
+            hexagram: {
+              primary: { n:parts[5]||'未知卦', d:'', lines:[1,1,1,1,1,1] },
+              changed: { n:parts[6]||'未知卦', d:'', lines:[1,1,1,1,1,1] },
+              movingYao: 1
+            },
+            tiyong: {
+              body: { symbol:'☯', name:'未知', wuxing:'' },
+              use: { symbol:'☯', name:'未知', wuxing:'' },
+              desc: '导入记录',
+              symbol:''
+            }
+          }
         };
         imported.push(record);
       }
-      if(imported.length===0){ alert('未解析到有效记录'); return; }
+      if(imported.length===0){ showToast('非目标数据'); return; }
       var exist=getHistory();
       var all=imported.concat(exist);
       localStorage.setItem('mhys_history',JSON.stringify(all));
