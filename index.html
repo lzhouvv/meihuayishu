@@ -331,7 +331,13 @@
 
   <div class="top-bar">
     <div class="tb-item"><span class="tb-icon">⏱</span> <span class="tb-val" id="current-time">--:--</span></div>
-    <div class="tb-item" style="margin-left:auto"><button class="btn btn-sm btn-primary" onclick="refreshScores()" title="刷新最新比分" id="refresh-btn" style="padding:4px 12px;font-size:.75rem">🔄 刷新比分</button></div>
+    <div class="tb-item" style="margin-left:auto;display:flex;gap:4px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()" style="font-size:.65rem;padding:3px 8px">📥 导入</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportHistory()" style="font-size:.65rem;padding:3px 8px">📤 导出</button>
+      <button class="btn btn-ghost btn-sm" onclick="showScoreEditor()" style="font-size:.65rem;padding:3px 8px">✏️ 比分</button>
+      <input type="file" id="import-file" accept=".csv,.xls,.xlsx" style="display:none" onchange="importHistory(event)">
+      <button class="btn btn-sm btn-primary" onclick="refreshScores()" title="刷新最新比分" id="refresh-btn" style="padding:4px 12px;font-size:.75rem">🔄 刷新比分</button>
+    </div>
   </div>
 
   <div class="card" style="padding:14px 18px;">
@@ -783,14 +789,22 @@ function showHistoryDetail(idx){
   var hasReal=realScore && realScore.h!==undefined && realScore.a!==undefined;
 
   // 判断胜平负是否命中
-  var isHit=false; var realWdl='';
+  var isWdlHit=false; var realWdl='';
   if(hasReal){
-    if(realScore.h>realScore.a){ realWdl='胜'; isHit=fmtWdl(rec.wdl)==='胜'; }
-    else if(realScore.h<realScore.a){ realWdl='负'; isHit=fmtWdl(rec.wdl)==='负'; }
-    else { realWdl='平局'; isHit=fmtWdl(rec.wdl)==='平局'; }
+    if(realScore.h>realScore.a){ realWdl='胜'; isWdlHit=fmtWdl(rec.wdl)==='胜'; }
+    else if(realScore.h<realScore.a){ realWdl='负'; isWdlHit=fmtWdl(rec.wdl)==='负'; }
+    else { realWdl='平局'; isWdlHit=fmtWdl(rec.wdl)==='平局'; }
   }
-  var hitStyle=isHit?'color:var(--success);font-weight:700':'opacity:.4;';
-  var hitBadge=isHit?'<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:.6rem;background:rgba(78,205,196,.15);color:var(--success);border:1px solid rgba(78,205,196,.2);margin-left:4px">✓</span>':'';
+  // 比分是否命中
+  var isScoreHit=hasReal && rec.score===(realScore.h+':'+realScore.a);
+  // 总进球是否命中
+  var predGoals=parseInt(rec.score.split(':')[0])+parseInt(rec.score.split(':')[1]);
+  var isGoalsHit=hasReal && predGoals===(realScore.h+realScore.a);
+
+  var hitWdlStyle=isWdlHit?'color:var(--success);font-weight:700':'opacity:.4;';
+  var hitScoreStyle=isScoreHit?'color:var(--success);font-weight:700':'opacity:.4;';
+  var hitGoalsStyle=isGoalsHit?'color:var(--success);font-weight:700':'opacity:.4;';
+  var hitBadge=isWdlHit?'<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:.6rem;background:rgba(78,205,196,.15);color:var(--success);border:1px solid rgba(78,205,196,.2);margin-left:4px">✓</span>':'';
 
   // 计算各项实际值
   var realTotal = hasReal ? (realScore.h + realScore.a) : null;
@@ -807,7 +821,7 @@ function showHistoryDetail(idx){
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">🏆 胜平负</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
     +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+fmtWdl(r.predictions.wdl)+'</span>'
-    +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitStyle+'">'+realWdl+'</span>'+hitBadge:'')
+    +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitWdlStyle+'">'+realWdl+'</span>'+hitBadge:'')
     +'</div></div>'
     // 半全场
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">🔄 半全场</div>'
@@ -818,13 +832,13 @@ function showHistoryDetail(idx){
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">🥅 比分</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
     +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+r.predictions.score+'</span>'
-    +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitStyle+'">'+realScore.h+':'+realScore.a+'</span>':'')
+    +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitScoreStyle+'">'+realScore.h+':'+realScore.a+'</span>':'')
     +'</div></div>'
     // 总进球：预测 vs 实际
     +'<div class="pred-item" style="margin-bottom:6px"><div class="p-label">⚽ 总进球</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-top:4px">'
     +'<span style="font-size:.72rem;color:var(--text-dim)">预测：</span><span style="font-weight:700;font-size:.95rem">'+r.predictions.goals+'</span>'
-    +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitStyle+'">'+realTotal+'球</span>':'')
+    +(hasReal?'<span style="font-size:.72rem;color:var(--text-dim)">实际：</span><span style="font-weight:700;font-size:.95rem;'+hitGoalsStyle+'">'+realTotal+'球</span>':'')
     +'</div></div>'
     +'</div>'
     +'<div style="font-size:.72rem;color:var(--text-dim);line-height:1.6;border-top:1px solid var(--border);padding-top:8px">'
@@ -895,6 +909,129 @@ function restoreTrash(idx){
   showTrash();
 }
 document.getElementById('history-detail-modal').onclick=function(e){ if(e.target===this) closeHistoryDetail(); };
+
+// ==================== 手动修改比分 ====================
+function showScoreEditor(){
+  var saved=getSavedScores();
+  var allDates=SORTED_DATES;
+  var body=document.getElementById('history-detail-body');
+  var h='<div style="margin-bottom:10px;font-size:.85rem;color:var(--text-dim)">手动修改已结束比赛的比分（输入后自动保存）</div>';
+  for(var di=0;di<allDates.length;di++){
+    var ds=allDates[di];
+    var ms=SCHEDULE[ds];
+    if(!ms) continue;
+    var dateLabel=ds.slice(5);
+    h+='<div style="font-size:.72rem;color:var(--accent-light);margin:8px 0 4px;font-weight:600">'+dateLabel+'</div>';
+    for(var mi=0;mi<ms.length;mi++){
+      var m=ms[mi];
+      var fh=(TEAMS[m.h]&&TEAMS[m.h].flag)||'', fa=(TEAMS[m.a]&&TEAMS[m.a].flag)||'';
+      var key=m.h+'|'+m.a;
+      var sc=saved[key];
+      if(!sc){ var rk=m.a+'|'+m.h; sc=saved[rk]; if(sc) sc={h:sc.a,a:sc.h}; }
+      var sh=sc?sc.h:'', sa=sc?sc.a:'';
+      h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">'
+        +'<span style="min-width:50px;font-size:.75rem">'+fh+' '+m.h+'</span>'
+        +'<input type="number" min="0" max="20" value="'+sh+'" style="width:36px;padding:2px 4px;background:var(--bg-dark);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.72rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'h\',this.value)">'
+        +'<span style="font-size:.7rem;color:var(--text-muted)">:</span>'
+        +'<input type="number" min="0" max="20" value="'+sa+'" style="width:36px;padding:2px 4px;background:var(--bg-dark);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:.72rem;text-align:center" onchange="saveManualScore(\''+key+'\',\'a\',this.value)">'
+        +'<span style="min-width:50px;font-size:.75rem">'+m.a+' '+fa+'</span>'
+        +'</div>';
+    }
+  }
+  body.innerHTML=h;
+  document.getElementById('history-detail-modal').classList.add('open');
+}
+
+function saveManualScore(key,side,val){
+  var saved=getSavedScores();
+  var parts=key.split('|');
+  if(!saved[key]) saved[key]={h:'',a:''};
+  saved[key][side]=parseInt(val)||0;
+  saveScores(saved);
+  renderMatchList(document.getElementById('datePicker').value);
+}
+function exportHistory(){
+  // 导出起卦记录 + 比分数据
+  var list=getHistory();
+  var scores=getSavedScores();
+  var csv='时间,主队,客队,预测结果,预测比分,本卦,变卦,实际主队得分,实际客队得分\n';
+  for(var i=0;i<list.length;i++){
+    var r=list[i];
+    var t=r.time.replace(/,/g,'，').replace(/"/g,'""');
+    var h=r.home.replace(/,/g,'，').replace(/"/g,'""');
+    var a=r.away.replace(/,/g,'，').replace(/"/g,'""');
+    var w=fmtWdl(r.wdl); var s=r.score; var pn=r.hexagramName; var cn=r.changedName;
+    var sc=scores[h+'|'+a]||scores[a+'|'+h];
+    var sh=sc?sc.h:'', sa=sc?sc.a:'';
+    csv+=t+','+h+','+a+','+w+','+s+','+pn+','+cn+','+sh+','+sa+'\n';
+  }
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='起卦记录_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importHistory(event){
+  var file=event.target.files[0];
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var text=e.target.result;
+      var lines=text.split('\n').filter(function(l){ return l.trim().length>0; });
+      if(lines.length<2){ alert('文件格式无效'); return; }
+      var imported=[];
+      for(var i=1;i<lines.length;i++){
+        // 按逗号分割，处理引号转义
+        var parts=parseCSVLine(lines[i]);
+        if(parts.length<7) continue;
+        var record={
+          id: Date.now()+i,
+          time: parts[0],
+          home: parts[1],
+          away: parts[2],
+          wdl: parts[3],
+          wdlBadge: parts[3]==='胜'?'win':parts[3]==='负'?'lose':parts[3]==='平局'?'draw':'win',
+          score: parts[4],
+          hexagramName: parts[5],
+          changedName: parts[6],
+          resultData: null
+        };
+        imported.push(record);
+      }
+      if(imported.length===0){ alert('未解析到有效记录'); return; }
+      var exist=getHistory();
+      var all=imported.concat(exist);
+      localStorage.setItem('mhys_history',JSON.stringify(all));
+      renderHistory();
+      alert('成功导入 '+imported.length+' 条记录');
+    } catch(err){
+      alert('导入失败：'+err.message);
+    }
+  };
+  reader.readAsText(file,'UTF-8');
+  event.target.value='';
+}
+
+function parseCSVLine(line){
+  var result=[], current='', inQuotes=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(inQuotes){
+      if(c==='"'){
+        if(i+1<line.length && line[i+1]==='"'){ current+='"'; i++; }
+        else inQuotes=false;
+      } else { current+=c; }
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ result.push(current); current=''; }
+      else current+=c;
+    }
+  }
+  result.push(current);
+  return result;
+}
 
 // ==================== 比分刷新 ====================
 const SCORE_STORAGE_KEY = 'mhys_scores';
