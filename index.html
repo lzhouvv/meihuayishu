@@ -232,6 +232,7 @@
   .history-item .hi-result.draw { color: var(--draw); }
   .history-item .hi-del { font-size:.65rem; color:var(--text-muted); cursor:pointer; padding:2px 6px; opacity:.3; transition:all .2s; }
   .history-item .hi-del:hover { opacity:1; color:var(--danger); }
+  .history-item.finished { opacity:.4; }
   .history-empty { text-align: center; padding: 40px; color: var(--text-dim); font-size: .95rem; }
   .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 12px 0 4px; font-size: .78rem; color: var(--text-dim); }
   .pagination .page-btn { background: var(--bg-dark); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--text-dim); cursor: pointer; font-size: .72rem; font-family: inherit; transition: all .2s; }
@@ -745,7 +746,9 @@ function renderHistory(){
   var h='';
   for(var i=start;i<end;i++){ var r=list[i];
     var fh=(TEAMS[r.home]&&TEAMS[r.home].flag)||''; var fa=(TEAMS[r.away]&&TEAMS[r.away].flag)||'';
-    h+='<div class="history-item"><span class="hi-time">'+r.time+'</span><span class="hi-home" onclick="showHistoryDetail('+i+')"><span class="ti"><span class="hi-flag">'+fh+'</span><span class="hi-name">'+r.home+'</span></span></span><span class="hi-vs">vs</span><span class="hi-away" onclick="showHistoryDetail('+i+')"><span class="ti"><span class="hi-flag">'+fa+'</span><span class="hi-name">'+r.away+'</span></span></span><span class="hi-result '+r.wdlBadge+'">'+fmtWdl(r.wdl)+'</span><span class="hi-del" onclick="deleteHistory('+i+')" title="删除此记录">✕</span></div>';
+    var isFinished=false; var saved=getSavedScores(); var key=r.home+'|'+r.away;
+    if(saved[key]||saved[r.away+'|'+r.home]) isFinished=true;
+    h+='<div class="history-item'+(isFinished?' finished':'')+'"><span class="hi-time">'+r.time+'</span><span class="hi-home" onclick="showHistoryDetail('+i+')"><span class="ti"><span class="hi-flag">'+fh+'</span><span class="hi-name">'+r.home+'</span></span></span><span class="hi-vs">vs</span><span class="hi-away" onclick="showHistoryDetail('+i+')"><span class="ti"><span class="hi-flag">'+fa+'</span><span class="hi-name">'+r.away+'</span></span></span><span class="hi-result '+r.wdlBadge+'">'+fmtWdl(r.wdl)+'</span><span class="hi-del" onclick="deleteHistory('+i+')" title="删除此记录">✕</span></div>';
   }
   // 翻页
   if(totalPages>1){
